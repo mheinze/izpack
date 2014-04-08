@@ -1251,16 +1251,20 @@ public class ConfigurationInstallerListener extends AbstractProgressInstallerLis
                 {
                     try
                     {
-                        String newValue = dynvar.evaluate(replacer);
-                        if (newValue != null)
+                        if (!(dynvar.isCheckonce() && dynvar.isChecked()))
                         {
-                            logger.fine("Configuration variable " + name + ": " + newValue);
-                            props.setProperty(name, newValue);
+                            String newValue = dynvar.evaluate(replacer);
+                            if (newValue != null)
+                            {
+                                logger.fine("Configuration variable " + name + ": " + newValue);
+                                props.setProperty(name, newValue);
+                            }
+                            else
+                            {
+                                logger.fine("Configuration variable " + name + " unchanged: " + dynvar.getValue());
+                            }
                         }
-                        else
-                        {
-                            logger.fine("Configuration variable " + name + " unchanged: " + dynvar.getValue());
-                        }
+                        dynvar.setChecked();
                     }
                     catch (Exception e)
                     {
