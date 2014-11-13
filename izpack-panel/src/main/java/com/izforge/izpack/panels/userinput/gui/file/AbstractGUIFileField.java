@@ -25,6 +25,7 @@ import java.io.File;
 
 import com.izforge.izpack.api.handler.Prompt;
 import com.izforge.izpack.gui.TwoColumnConstraints;
+import com.izforge.izpack.panels.userinput.field.Field;
 import com.izforge.izpack.panels.userinput.field.file.AbstractFileField;
 import com.izforge.izpack.panels.userinput.gui.GUIField;
 
@@ -62,13 +63,20 @@ public abstract class AbstractGUIFileField extends GUIField
     public boolean updateField(Prompt prompt, boolean skipValidation)
     {
         boolean result = false;
-        if (skipValidation || fileInput.validateField())
+        if (skipValidation)
+        {
+            getField().setValue(fileInput.filetxt.getText());
+            result = true;
+        }
+        else if (fileInput.validateField())
         {
             File selectedFile = fileInput.getSelectedFile();
             if (selectedFile == null)
             {
                 getField().setValue("");
-            } else {
+            }
+            else
+            {
                 getField().setValue(selectedFile.getAbsolutePath());
             }
             result = true;
@@ -92,6 +100,16 @@ public abstract class AbstractGUIFileField extends GUIField
             fileInput.setFile(value);
             result = true;
         }
+        else
+        {
+            // Set default value here for getting current variable values replaced
+            Field field = getField();
+            String defaultValue = field.getDefaultValue();
+            if (defaultValue != null)
+            {
+                fileInput.setFile(defaultValue);
+            }
+        }
 
         return result;
     }
@@ -104,6 +122,10 @@ public abstract class AbstractGUIFileField extends GUIField
     protected void init(FileInputField inputField)
     {
         this.fileInput = inputField;
+        if(getField().getDescription() != null)
+        {
+            addDescription();
+        }
         if (getField().getLabel() != null)
         {
             addLabel();

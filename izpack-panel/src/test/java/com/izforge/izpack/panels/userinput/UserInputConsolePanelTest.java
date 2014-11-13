@@ -204,13 +204,13 @@ public class UserInputConsolePanelTest
      * @param id         the panel identifier
      * @return a new {@code ConsolePanels}
      */
-    private ConsolePanels createPanels(Class panelClass, String id)
+    private ConsolePanels createPanels(Class<UserInputPanel> panelClass, String id)
     {
         Panel panel = new Panel();
         panel.setClassName(panelClass.getName());
         panel.setPanelId(id);
         ConsolePanelView panelView = new ConsolePanelView(panel, factory, installData, console);
-        ConsolePanels panels = new ConsolePanels(Arrays.asList(panelView), installData.getVariables());
+        ConsolePanels panels = new ConsolePanels(Arrays.asList(panelView), installData);
         container.addComponent(ConsolePanels.class, panels);
         panels.setAction(new ConsoleInstallAction(console, installData, mock(UninstallDataWriter.class)));
         return panels;

@@ -21,14 +21,6 @@
 
 package com.izforge.izpack.panels.userinput.gui.title;
 
-import java.awt.Font;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
-import javax.swing.ImageIcon;
-import javax.swing.JLabel;
-import javax.swing.SwingConstants;
-
 import com.izforge.izpack.api.data.InstallData;
 import com.izforge.izpack.gui.IconsDatabase;
 import com.izforge.izpack.gui.LabelFactory;
@@ -36,6 +28,12 @@ import com.izforge.izpack.gui.TwoColumnConstraints;
 import com.izforge.izpack.panels.userinput.field.Alignment;
 import com.izforge.izpack.panels.userinput.field.title.TitleField;
 import com.izforge.izpack.panels.userinput.gui.GUIField;
+
+import javax.swing.*;
+
+import java.awt.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Title field view.
@@ -49,6 +47,8 @@ public class GUITitleField extends GUIField
      * The logger.
      */
     private static final Logger logger = Logger.getLogger(GUITitleField.class.getName());
+
+    private JLabel label = null;
 
     /**
      * Constructs a {@code GUITitleField}.
@@ -64,7 +64,6 @@ public class GUITitleField extends GUIField
 
         if (title != null)
         {
-            JLabel label = null;
             ImageIcon icon;
             String iconName = field.getIconName(installData.getMessages());
             if (iconName != null)
@@ -105,6 +104,21 @@ public class GUITitleField extends GUIField
             TwoColumnConstraints constraints = new TwoColumnConstraints(TwoColumnConstraints.NORTH, justify);
             addComponent(label, constraints);
         }
+        addTooltip();
+    }
+
+    @Override
+    public boolean updateView()
+    {
+        String value = getField().getLabel();
+
+        if (value != null)
+        {
+            // Set value here for getting current variable values replaced
+            label.setText(replaceVariables(value));
+        }
+
+        return false;
     }
 
     /**

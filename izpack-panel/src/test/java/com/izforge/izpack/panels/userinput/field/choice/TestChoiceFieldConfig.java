@@ -23,7 +23,6 @@ package com.izforge.izpack.panels.userinput.field.choice;
 
 import java.util.List;
 
-import com.izforge.izpack.api.rules.RulesEngine;
 import com.izforge.izpack.panels.userinput.field.Choice;
 import com.izforge.izpack.panels.userinput.field.ChoiceFieldConfig;
 import com.izforge.izpack.panels.userinput.field.TestFieldConfig;
@@ -34,12 +33,12 @@ import com.izforge.izpack.panels.userinput.field.TestFieldConfig;
  *
  * @author Tim Anderson
  */
-public class TestChoiceFieldConfig<T extends Choice> extends TestFieldConfig implements ChoiceFieldConfig<T>
+public class TestChoiceFieldConfig<T extends Choice> extends TestFieldConfig implements ChoiceFieldConfig
 {
     /**
      * The available choices.
      */
-    private final List<T> choices;
+    private final List<Choice> choices;
 
     /**
      * The selected choice, or {@code -1} if no choice is selected.
@@ -53,31 +52,21 @@ public class TestChoiceFieldConfig<T extends Choice> extends TestFieldConfig imp
      * @param choices  the available choices
      * @param selected the initial selection, or {@code -1} if no choice is selected
      */
-    public TestChoiceFieldConfig(String variable, List<T> choices, int selected)
+    public TestChoiceFieldConfig(String variable, List<Choice> choices, int selected)
     {
         super(variable);
         this.choices = choices;
         this.selected = selected;
     }
 
-    /**
-     * Returns the choices.
-     *
-     * @return the choices
-     */
     @Override
-    public List<T> getChoices(RulesEngine rules)
+    public List<Choice> getChoices()
     {
         return choices;
     }
 
-    /**
-     * Returns the index of the selected choice.
-     *
-     * @return the selected index or {@code -1} if no choice is selected
-     */
     @Override
-    public int getSelectedIndex()
+    public int getSelectedIndex(String variable)
     {
         return selected;
     }

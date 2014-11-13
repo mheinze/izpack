@@ -21,20 +21,18 @@
 
 package com.izforge.izpack.panels.userinput.gui.radio;
 
+import com.izforge.izpack.api.handler.Prompt;
+import com.izforge.izpack.gui.TwoColumnConstraints;
+import com.izforge.izpack.panels.userinput.field.Choice;
+import com.izforge.izpack.panels.userinput.field.radio.RadioField;
+import com.izforge.izpack.panels.userinput.gui.GUIField;
+
+import javax.swing.*;
+
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.List;
-
-import javax.swing.ButtonGroup;
-import javax.swing.JRadioButton;
-
-import com.izforge.izpack.api.data.InstallData;
-import com.izforge.izpack.api.handler.Prompt;
-import com.izforge.izpack.gui.TwoColumnConstraints;
-import com.izforge.izpack.panels.userinput.field.radio.RadioChoice;
-import com.izforge.izpack.panels.userinput.field.radio.RadioField;
-import com.izforge.izpack.panels.userinput.gui.GUIField;
 
 
 /**
@@ -53,9 +51,8 @@ public class GUIRadioField extends GUIField
      * Constructs a {@code GUIRadioField}.
      *
      * @param field       the field
-     * @param installData the installation data
      */
-    public GUIRadioField(RadioField field, InstallData installData)
+    public GUIRadioField(RadioField field)
     {
         super(field);
         String variable = field.getVariable();
@@ -76,33 +73,32 @@ public class GUIRadioField extends GUIField
                 notifyUpdateListener();
             }
         };
-        for (RadioChoice choice : field.getChoices())
+
+        if (getField().getDescription() != null)
+        {
+            addDescription();
+        }
+
+        for (Choice choice : field.getChoices())
         {
             JRadioButton button = new JRadioButton();
             button.setName(variable + "." + id);
             ++id;
             button.setText(choice.getValue());
-            if (choice.getRevalidate())
-            {
-                button.addActionListener(l);
-            }
-            String value = choice.getTrueValue();
+            button.addActionListener(l);
 
             group.add(button);
             boolean selected = field.getSelectedIndex() == group.getButtonCount() - 1;
 
             if (selected)
             {
-                if (installData.getVariable(variable) == null)
-                {
-                    installData.setVariable(variable, value);
-                }
                 button.setSelected(true);
             }
 
             choices.add(new RadioChoiceView(choice, button));
             addComponent(button, constraints);
         }
+        addTooltip();
     }
 
     /**
@@ -152,20 +148,37 @@ public class GUIRadioField extends GUIField
 
         if (value != null)
         {
-            for (RadioChoiceView view : choices)
+            result = splitValue(value);
+        }
+
+        if (!result) // fallback for invalid values
+        {
+            // Set default value here for getting current variable values replaced
+            String defaultValue = field.getDefaultValue();
+            if (defaultValue != null)
             {
-                if (value.equals(view.choice.getTrueValue()))
-                {
-                    view.button.setSelected(true);
-                }
-                else
-                {
-                    view.button.setSelected(false);
-                }
+                result = splitValue(defaultValue);
             }
-            result = true;
         }
         return result;
+    }
+
+    private boolean splitValue(String value)
+    {
+        for (RadioChoiceView view : choices)
+        {
+            if (value.equals(view.choice.getTrueValue()))
+            {
+                view.button.setSelected(true);
+                notifyUpdateListener();
+                return true;
+            }
+            else
+            {
+                view.button.setSelected(false);
+            }
+        }
+        return false;
     }
 
     /**
@@ -173,11 +186,11 @@ public class GUIRadioField extends GUIField
      */
     private class RadioChoiceView
     {
-        private RadioChoice choice;
+        private Choice choice;
 
         private JRadioButton button;
 
-        public RadioChoiceView(RadioChoice choice, JRadioButton button)
+        public RadioChoiceView(Choice choice, JRadioButton button)
         {
             this.choice = choice;
             this.button = button;

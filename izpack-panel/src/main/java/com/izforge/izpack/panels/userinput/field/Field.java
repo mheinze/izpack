@@ -46,7 +46,12 @@ public abstract class Field
     /**
      * The variable. May be {@code null}.
      */
-    private final String variable;
+    private String variable;
+
+    /**
+     * The variable. May be {@code null}.
+     */
+    private final String summaryKey;
 
     /**
      * Specifies the default (or set) value for the field.
@@ -89,9 +94,9 @@ public abstract class Field
     private final String description;
 
     /**
-     * Determines if field updates trigger re-validation.
+     * The field's tooltip. May be {@code null}
      */
-    private final boolean revalidate;
+    private final String tooltip;
 
     /**
      * Condition that determines if the field is displayed or not.
@@ -99,9 +104,19 @@ public abstract class Field
     private final String condition;
 
     /**
+     * Determines if the field should always be displayed on the panel regardless if its conditionid is true or false.
+     * If the conditionid is false, display the field but disable it.
+     */
+    private boolean displayHidden;
+    /**
      * The installation data.
      */
     private final InstallData installData;
+
+    /**
+     * Determines if the 'value' of an entry will be included in the user input panel
+     */
+    private boolean omitFromAuto;
 
     /**
      * The logger.
@@ -118,6 +133,7 @@ public abstract class Field
     public Field(FieldConfig config, InstallData installData)
     {
         variable = config.getVariable();
+        summaryKey = config.getSummaryKey();
         set = config.getDefaultValue();
         size = config.getSize();
         packs = config.getPacks();
@@ -126,9 +142,12 @@ public abstract class Field
         processor = config.getProcessor();
         label = config.getLabel();
         description = config.getDescription();
-        this.revalidate = config.getRevalidate();
+        displayHidden = config.getDisplayHidden();
+        tooltip = config.getTooltip();
+        omitFromAuto = config.getOmitFromAuto();
         this.condition = config.getCondition();
         this.installData = installData;
+
 
         if (variable != null)
         {
@@ -147,6 +166,16 @@ public abstract class Field
     }
 
     /**
+     * Returns the value of 'omitFromAuto' from fields spec
+     *
+     * @return the 'omitFromAuto' attribute
+     */
+    public boolean getOmitFromAuto()
+    {
+        return omitFromAuto;
+    }
+
+    /**
      * Returns all variables that this field updates.
      *
      * @return all variables that this field updates
@@ -154,6 +183,27 @@ public abstract class Field
     public List<String> getVariables()
     {
         return variable != null ? Arrays.asList(variable) : Collections.<String>emptyList();
+    }
+
+    /**
+     * Returns the summaryKey.
+     *
+     * @return the summaryKey. May be {@code null}
+     */
+    public String getSummaryKey()
+    {
+        return summaryKey;
+    }
+
+    /**
+     * Determines if the field should always be displayed on the panel regardless if its conditionid is true or false.
+     * If the conditionid is false, display the field but disable it.
+     *
+     * @return {@code true} if displaying hidden otherwise {@code false}
+     */
+    public boolean getDisplayHidden()
+    {
+        return displayHidden;
     }
 
     /**
@@ -343,14 +393,11 @@ public abstract class Field
     }
 
     /**
-     * Determines if the field triggers revalidation on update.
+     * Returns the field tooltip.
      *
-     * @return {@code true} if the field triggers revalidation
+     * @return the field tooltip. May be {@code null}
      */
-    public boolean getRevalidate()
-    {
-        return revalidate;
-    }
+    public String getTooltip() { return tooltip; }
 
     /**
      * Determines if the condition associated with the field is true.
@@ -433,4 +480,10 @@ public abstract class Field
         }
     }
 
+    //TODO: Scary thought to have variable not final
+    //TODO: Need to check that variable doesn't already exist
+    public void setVariable(String newVariableName)
+    {
+        this.variable = newVariableName;
+    }
 }

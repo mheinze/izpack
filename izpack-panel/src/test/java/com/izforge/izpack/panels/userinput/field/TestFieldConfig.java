@@ -21,12 +21,13 @@
 
 package com.izforge.izpack.panels.userinput.field;
 
+import com.izforge.izpack.api.adaptator.IXMLElement;
+import com.izforge.izpack.api.data.binding.OsModel;
+import com.izforge.izpack.api.exception.IzPackException;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import com.izforge.izpack.api.data.binding.OsModel;
-import com.izforge.izpack.api.exception.IzPackException;
 
 /**
  * Implementation of {@link FieldConfig} for testing purposes.
@@ -50,6 +51,11 @@ public class TestFieldConfig implements FieldConfig
      * The label.
      */
     private String label;
+
+    /**
+     * The tooltip.
+     */
+    private String tooltip;
 
     /**
      * The validators.
@@ -77,6 +83,18 @@ public class TestFieldConfig implements FieldConfig
     public String getVariable()
     {
         return variable;
+    }
+
+    @Override
+    public String getSummaryKey()
+    {
+        return null;
+    }
+
+    @Override
+    public boolean getDisplayHidden()
+    {
+        return false;
     }
 
     /**
@@ -139,6 +157,12 @@ public class TestFieldConfig implements FieldConfig
         return validators;
     }
 
+    @Override
+    public List<FieldValidator> getValidators(IXMLElement field)
+    {
+        return getValidators();
+    }
+
     /**
      * Adds a validator.
      *
@@ -183,6 +207,14 @@ public class TestFieldConfig implements FieldConfig
     }
 
     /**
+     * Returns the field tooltip.
+     *
+     * @return the field tooltip. Maybe {@code null}
+     */
+    @Override
+    public String getTooltip() { return tooltip; }
+
+    /**
      * Sets the field label.
      *
      * @param label the label. May be {@code null}
@@ -190,17 +222,6 @@ public class TestFieldConfig implements FieldConfig
     public void setLabel(String label)
     {
         this.label = label;
-    }
-
-    /**
-     * Determines if field updates trigger re-validation.
-     *
-     * @return {@code true} if the field triggers revalidation
-     */
-    @Override
-    public boolean getRevalidate()
-    {
-        return false;
     }
 
     /**
@@ -212,5 +233,10 @@ public class TestFieldConfig implements FieldConfig
     public String getCondition()
     {
         return null;
+    }
+
+    @Override
+    public boolean getOmitFromAuto() {
+        return false;
     }
 }

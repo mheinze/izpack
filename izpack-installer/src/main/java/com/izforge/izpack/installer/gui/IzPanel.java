@@ -68,7 +68,7 @@ import com.izforge.izpack.installer.data.GUIInstallData;
  * @author Julien Ponge
  * @author Klaus Bartz
  */
-public class IzPanel extends JPanel implements AbstractUIHandler, LayoutConstants, ISummarisable
+public abstract class IzPanel extends JPanel implements AbstractUIHandler, LayoutConstants, ISummarisable
 {
     private static final long serialVersionUID = 3256442495255786038L;
 
@@ -295,6 +295,11 @@ public class IzPanel extends JPanel implements AbstractUIHandler, LayoutConstant
         return true;
     }
 
+    protected void saveData()
+    {
+        //Save Data
+    }
+
     public boolean panelValidated()
     {
         return isValidated();
@@ -317,15 +322,10 @@ public class IzPanel extends JPanel implements AbstractUIHandler, LayoutConstant
     {
     }
 
-    /**
-     * Asks the panel to set its own XML data that can be brought back for an automated installation
-     * process. Use it as a blackbox if your panel needs to do something even in automated mode.
-     *
-     * @param panelRoot The XML root element of the panels blackbox tree.
-     */
-    public void makeXMLData(IXMLElement panelRoot)
+    public void createInstallationRecord(IXMLElement rootElement)
     {
-    }
+        // Default method, override to record panel contents
+    };
 
     /**
      * Ask the user a question.
@@ -356,6 +356,12 @@ public class IzPanel extends JPanel implements AbstractUIHandler, LayoutConstant
     public int askQuestion(final String title, final String question, int choices, int defaultChoice)
     {
         return new PromptUIHandler(new GUIPrompt(this)).askQuestion(title, question, choices, defaultChoice);
+    }
+
+    @Override
+    public int askWarningQuestion(final String title, final String question, int choices, int defaultChoice)
+    {
+        return new PromptUIHandler(new GUIPrompt(this)).askWarningQuestion(title, question, choices, defaultChoice);
     }
 
     public boolean emitNotificationFeedback(final String message)
@@ -456,41 +462,37 @@ public class IzPanel extends JPanel implements AbstractUIHandler, LayoutConstant
     {
         String retval = null;
 
-        List<String> panelIdParts = new ArrayList<String>();
-        if (getMetadata().hasPanelId())
-        {
-            panelIdParts.add("." + getMetadata().getPanelId());
-        }
-        panelIdParts.add("");
+        List<String> prefixes = new ArrayList<String>();
+        String panelId = getMetadata().getPanelId();
+        Class<?> clazz = this.getClass();
 
-        for (String panelIdPart : panelIdParts)
+        String fullClassname = alternateClass==null?clazz.getName():alternateClass;
+        String simpleClassname = alternateClass==null?clazz.getSimpleName():alternateClass;
+
+        do
         {
-          Class<?> clazz = this.getClass();
-          while (retval == null && !clazz.equals(IzPanel.class))
-          {
-            // Try <full class name>[.<panel id>].<subkey>
-            String className = alternateClass==null?clazz.getName():alternateClass;
-            String searchkey = className + panelIdPart + "." + subkey;
+            prefixes.add(fullClassname + "." + panelId);
+            prefixes.add(simpleClassname + "." + panelId);
+            prefixes.add(fullClassname);
+            prefixes.add(simpleClassname);
+
+            clazz = clazz.getSuperclass();
+            fullClassname = clazz.getName();
+            simpleClassname = clazz.getSimpleName();
+        } while (alternateClass == null && !clazz.equals(IzPanel.class));
+        prefixes.add(2, panelId);
+
+        for (String prefix : prefixes)
+        {
+            String searchkey = prefix + "." + subkey;
             if (installData.getMessages().getMessages().containsKey(searchkey))
             {
                 retval = getString(searchkey);
             }
-            if (retval == null)
-            {
-                // Try <simple class name>[.<panel id>].<subkey>
-                className = alternateClass==null?clazz.getSimpleName():alternateClass;            // Try <simple class name>.<panel id>.<subkey>
-                searchkey = className + panelIdPart + "." + subkey;
-                if (installData.getMessages().getMessages().containsKey(searchkey))
-                {
-                    retval = getString(searchkey);
-                }
-            }
-            if (alternateClass != null)
+            if (retval != null)
             {
                 break;
             }
-            clazz = clazz.getSuperclass();
-          }
         }
 
         if (retval != null && retval.indexOf('$') > -1)

@@ -25,6 +25,7 @@ import java.util.Set;
 
 import com.izforge.izpack.api.adaptator.IXMLElement;
 import com.izforge.izpack.api.data.InstallData;
+import com.izforge.izpack.api.data.Panel;
 import com.izforge.izpack.api.data.Variables;
 
 /**
@@ -42,7 +43,9 @@ public interface RulesEngine
 
     boolean isConditionTrue(Condition cond);
 
-    boolean canShowPanel(String panelid, Variables variables);
+    boolean canShowPanel(String panelId, Variables variables);
+
+    void addPanelCondition(Panel panel, Condition newCondition);
 
     boolean canInstallPack(String packid, Variables variables);
 
@@ -59,7 +62,7 @@ public interface RulesEngine
     void analyzeXml(IXMLElement conditionsspec);
 
     @Deprecated
-    Condition instanciateCondition(IXMLElement condition);
+    Condition instantiateCondition(IXMLElement condition);
 
     /**
      * Creates a condition given its XML specification.

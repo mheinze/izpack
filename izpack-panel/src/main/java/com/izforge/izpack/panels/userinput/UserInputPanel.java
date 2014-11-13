@@ -18,42 +18,32 @@
  */
 package com.izforge.izpack.panels.userinput;
 
-import java.awt.BorderLayout;
-import java.awt.Dimension;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import javax.swing.BorderFactory;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.border.Border;
-
 import com.izforge.izpack.api.adaptator.IXMLElement;
 import com.izforge.izpack.api.data.Panel;
-import com.izforge.izpack.api.data.binding.OsModel;
 import com.izforge.izpack.api.exception.IzPackException;
 import com.izforge.izpack.api.factory.ObjectFactory;
 import com.izforge.izpack.api.handler.Prompt;
 import com.izforge.izpack.api.resource.Resources;
+import com.izforge.izpack.api.rules.Condition;
 import com.izforge.izpack.api.rules.RulesEngine;
+import com.izforge.izpack.gui.ButtonFactory;
 import com.izforge.izpack.gui.TwoColumnLayout;
 import com.izforge.izpack.installer.data.GUIInstallData;
 import com.izforge.izpack.installer.gui.InstallerFrame;
 import com.izforge.izpack.installer.gui.IzPanel;
-import com.izforge.izpack.panels.userinput.field.ElementReader;
-import com.izforge.izpack.panels.userinput.field.Field;
-import com.izforge.izpack.panels.userinput.field.FieldHelper;
-import com.izforge.izpack.panels.userinput.field.FieldView;
-import com.izforge.izpack.panels.userinput.field.UserInputPanelSpec;
+import com.izforge.izpack.panels.userinput.field.*;
 import com.izforge.izpack.panels.userinput.gui.Component;
 import com.izforge.izpack.panels.userinput.gui.GUIField;
 import com.izforge.izpack.panels.userinput.gui.GUIFieldFactory;
 import com.izforge.izpack.panels.userinput.gui.UpdateListener;
+import com.izforge.izpack.panels.userinput.gui.custom.GUICustomField;
 import com.izforge.izpack.util.PlatformModelMatcher;
+
+import javax.swing.*;
+import javax.swing.border.Border;
+import java.awt.*;
+import java.util.*;
+import java.util.List;
 
 /**
  * User input panel.
@@ -62,8 +52,10 @@ import com.izforge.izpack.util.PlatformModelMatcher;
  */
 public class UserInputPanel extends IzPanel
 {
+    private static final String SUMMARY_KEY = "summaryKey";
     private static final String TOPBUFFER = "topBuffer";
     private static final String RIGID = "rigid";
+    private static final String DISPLAY_HIDDEN = "displayHidden";
 
     /**
      * The parsed result from reading the XML specification from the file
@@ -93,6 +85,12 @@ public class UserInputPanel extends IzPanel
      * The prompt.
      */
     private final Prompt prompt;
+
+    /**
+     * Indicate if allowed to display hidden fields.
+     * When displaying hidden fields show them on the panel but disabled.
+     */
+    private boolean isDisplayingHidden;
 
     /**
      * The delegating prompt. This is used to switch between the above prompt and a no-op prompt when performing
@@ -128,7 +126,7 @@ public class UserInputPanel extends IzPanel
      * @param prompt      the prompt
      */
     public UserInputPanel(Panel panel, InstallerFrame parent, GUIInstallData installData, Resources resources,
-                          RulesEngine rules, ObjectFactory factory, PlatformModelMatcher matcher, Prompt prompt)
+                          RulesEngine rules, ObjectFactory factory, final PlatformModelMatcher matcher, Prompt prompt)
     {
         super(panel, parent, installData, resources);
 
@@ -137,6 +135,33 @@ public class UserInputPanel extends IzPanel
         this.matcher = matcher;
         this.prompt = prompt;
         this.delegatingPrompt = new DelegatingPrompt(prompt);
+
+        this.spec = readSpec();
+        try
+        {
+            this.isDisplayingHidden = Boolean.parseBoolean(spec.getAttribute(DISPLAY_HIDDEN));
+        }
+        catch (Exception ignore)
+        {
+            this.isDisplayingHidden = false;
+        }
+
+
+        // Prevent activating on certain global conditions
+        ElementReader reader = new ElementReader(userInputModel.getConfig());
+        Condition globalConstraint = reader.getComplexPanelCondition(spec, matcher, installData, rules);
+        if (globalConstraint != null)
+        {
+            rules.addPanelCondition(panel, globalConstraint);
+        }
+
+        init();
+        addScrollPane();
+        Dimension size = getMaximumSize();
+        setSize(size.width, size.height);
+        buildUI();
+        updateUIElements();
+        validate();
     }
 
     /**
@@ -152,13 +177,16 @@ public class UserInputPanel extends IzPanel
     }
 
     /**
+     * Save visible contents of the this panel into install data.
+     */
+    @Override
+    public void saveData() { readInput(prompt, true); }
+    /**
      * This method is called when the panel becomes active.
      */
     @Override
     public void panelActivate()
     {
-        this.init();
-
         if (spec == null)
         {
             // TODO: translate
@@ -168,29 +196,9 @@ public class UserInputPanel extends IzPanel
         }
         else
         {
-            // update UI with current values of associated variables
+            //Here just to update dynamic variables
             updateUIElements();
-
-            ElementReader reader = new ElementReader(userInputModel.getConfig());
-            List<String> forPacks = reader.getPacks(spec);
-            List<String> forUnselectedPacks = reader.getUnselectedPacks(spec);
-            List<OsModel> forOs = reader.getOsModels(spec);
-
-            if (!FieldHelper.isRequiredForPacks(forPacks, installData.getSelectedPacks())
-                    || !FieldHelper.isRequiredForUnselectedPacks(forUnselectedPacks, installData.getSelectedPacks())
-                    || !matcher.matchesCurrentPlatform(forOs))
-            {
-                parent.skipPanel();
-            }
-            else
-            {
-                buildUI();
-                addScrollPane();
-
-                Dimension size = getMaximumSize();
-                setSize(size.width, size.height);
-                validate();
-            }
+            buildUI();
         }
         // Focus the first panel component according to the default traversal
         // policy avoiding forcing the user to click into that field first
@@ -199,45 +207,23 @@ public class UserInputPanel extends IzPanel
     }
 
     /**
-     * Asks the panel to set its own XML installDataGUI that can be brought back for an automated installation
-     * process. Use it as a blackbox if your panel needs to do something even in automated mode.
-     *
-     * @param panelRoot The XML root element of the panels blackbox tree.
+     * Creates an installation record for unattended installations on {@link UserInputPanel},
+     * created during GUI installations.
      */
     @Override
-    public void makeXMLData(IXMLElement panelRoot)
+    public void createInstallationRecord(IXMLElement rootElement)
     {
-        Map<String, String> entryMap = new HashMap<String, String>();
-
-        for (String variable : variables)
-        {
-            entryMap.put(variable, installData.getVariable(variable));
-        }
-        for (FieldView view : views)
-        {
-            String variable = view.getField().getVariable();
-            if (variable != null)
-            {
-                entryMap.put(variable, installData.getVariable(variable));
-            }
-        }
-
-        new UserInputPanelAutomationHelper(entryMap).makeXMLData(installData, panelRoot);
+        new UserInputPanelAutomationHelper(variables, views).createInstallationRecord(installData, rootElement);
     }
 
+    /**
+     * Initialize the panel.
+     */
     private void init()
     {
         eventsActivated = false;
         super.removeAll();
         views.clear();
-
-        // ----------------------------------------------------
-        // read the specifications
-        // ----------------------------------------------------
-        if (spec == null)
-        {
-            spec = readSpec();
-        }
 
         setLayout(new BorderLayout());
 
@@ -253,6 +239,9 @@ public class UserInputPanel extends IzPanel
 
         // refresh variables specified in spec
         updateVariables();
+
+        // clear button mnemonics map
+        ButtonFactory.clearPanelButtonMnemonics();
 
         // ----------------------------------------------------
         // process all field nodes. Each field node is analyzed
@@ -272,13 +261,16 @@ public class UserInputPanel extends IzPanel
         List<Field> fields = userInputModel.createFields(spec);
         for (Field field : fields)
         {
-            GUIField view = viewFactory.create(field);
+            GUIField view = viewFactory.create(field, userInputModel, spec);
             view.setUpdateListener(listener);
             views.add(view);
         }
         eventsActivated = true;
     }
 
+    /**
+     * Set elements to be visible or not.
+     */
     protected void updateUIElements()
     {
         boolean updated = false;
@@ -313,18 +305,37 @@ public class UserInputPanel extends IzPanel
 
         for (GUIField view : views)
         {
+            boolean enabled = false;
+            boolean addToPanel = false;
+
             Field field = view.getField();
             if (FieldHelper.isRequired(field, installData, matcher) && field.isConditionTrue())
             {
+                enabled = true;
+                addToPanel = true;
                 view.setDisplayed(true);
-                for (Component component : view.getComponents())
-                {
-                    panel.add(component.getComponent(), component.getConstraints());
-                }
+            }
+            else if (FieldHelper.isRequired(field, installData, matcher) &&
+                    (field.getDisplayHidden() ||isDisplayingHidden ))
+            {
+                enabled = false;
+                addToPanel = true;
+                view.setDisplayed(false);
             }
             else
             {
+                enabled = false;
+                addToPanel = false;
                 view.setDisplayed(false);
+            }
+
+            if (addToPanel)
+            {
+                for (Component component : view.getComponents())
+                {
+                    component.getComponent().setEnabled(enabled);
+                    panel.add(component.getComponent(), component.getConstraints());
+                }
             }
         }
     }
@@ -459,5 +470,133 @@ public class UserInputPanel extends IzPanel
         scroller.getVerticalScrollBar().setBorder(emptyBorder);
         scroller.getHorizontalScrollBar().setBorder(emptyBorder);
         add(scroller, BorderLayout.CENTER);
+    }
+
+    /**
+     * @return Caption for the summary panel. Returns null if summaryKey is not specified.
+     */
+    @Override
+    public String getSummaryCaption()
+    {
+        String associatedLabel;
+        try
+        {
+            associatedLabel = spec.getAttribute(SUMMARY_KEY);
+        }
+        catch (Exception setToNull)
+        {
+            associatedLabel = null;
+        }
+        return installData.getMessages().get(associatedLabel);
+    }
+
+    /**
+     * Summarize all the visible views in the panel.
+     * @return
+     */
+    @Override
+    public String getSummaryBody()
+    {
+        if (getMetadata().hasCondition() && !rules.isConditionTrue(getMetadata().getCondition()))
+        {
+            return null;
+        }
+        else
+        {
+            StringBuilder entries = new StringBuilder();
+
+            for (GUIField view : views)
+            {
+                if (view.isDisplayed() && view.getVariable() != null)
+                {
+                    if (view instanceof GUICustomField)
+                    {
+                        entries.append(getCustomSummary((GUICustomField) view));
+                    }
+                    else
+                    {
+                        entries.append(getViewSummary(view));
+                    }
+                }
+
+            }
+            return entries.toString();
+        }
+    }
+
+    /**
+     * Extract summary information from regular fields
+     *
+     * @param view
+     * @return summary information for a field
+     */
+    private String getViewSummary(GUIField view)
+    {
+        String  associatedVariable, associatedLabel, key, value;
+        associatedVariable = view.getVariable();
+        associatedLabel = view.getSummaryKey();
+
+        if (associatedLabel != null)
+        {
+            key = installData.getMessages().get(associatedLabel);
+            value = installData.getVariable(associatedVariable);
+            return (key + " " + value + "<br>");
+        }
+        return "";
+    }
+
+    /**
+     * Extract summary information from custom fields.
+     *
+     * @param customField
+     * @return summary information for a custom field
+     */
+    private String getCustomSummary(GUICustomField customField)
+    {
+        List<String> labels = customField.getLabels();
+        List<String> variables = customField.getVariables();
+        int numberOfColumns = labels.size();
+
+        int column = 0;
+        int row = 0;
+        String tab = "";
+        String entry = "";
+        String key = "";
+        String value = "";
+
+
+        for(String variable : variables)
+        {
+            boolean firstColumn = (column % numberOfColumns == 0);
+
+            if(!firstColumn)
+            {
+                tab = "&nbsp;&nbsp;&nbsp;&nbsp;";
+                column++;
+            }
+            else
+            {
+                tab = "";
+                column=1; //Reset to first column
+            }
+
+            key = installData.getMessages().get(installData.getMessages().get(labels.get(column-1)));
+            value = installData.getVariable(variable);
+
+            if (key != null)
+            {
+                if (firstColumn)
+                {
+                    row++;
+                    entry += String.format("%1$-3s", row + ". ");
+                }
+                entry += String.format(tab + key);
+                entry += String.format(" " + value);
+                entry += "<br>";
+            }
+
+        }
+
+        return entry;
     }
 }

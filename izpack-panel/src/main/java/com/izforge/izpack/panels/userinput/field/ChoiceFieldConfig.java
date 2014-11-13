@@ -23,27 +23,25 @@ package com.izforge.izpack.panels.userinput.field;
 
 import java.util.List;
 
-import com.izforge.izpack.api.rules.RulesEngine;
-
 
 /**
  * Configuration for fields that have a set of pre-defined choices.
  *
  * @author Tim Anderson
  */
-public interface ChoiceFieldConfig<T extends Choice> extends FieldConfig
+public interface ChoiceFieldConfig extends FieldConfig
 {
     /**
      * Returns the choices.
      *
      * @return the choices
      */
-    List<T> getChoices(RulesEngine rules);
+    List<Choice> getChoices();
 
     /**
      * Returns the index of the selected choice.
      *
      * @return the selected index or {@code -1} if no choice is selected
      */
-    int getSelectedIndex();
+    int getSelectedIndex(String variable);
 }

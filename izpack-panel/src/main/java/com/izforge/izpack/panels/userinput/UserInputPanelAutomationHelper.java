@@ -22,8 +22,12 @@
 
 package com.izforge.izpack.panels.userinput;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Logger;
 
 import com.izforge.izpack.api.adaptator.IXMLElement;
@@ -32,6 +36,9 @@ import com.izforge.izpack.api.data.InstallData;
 import com.izforge.izpack.api.data.Variables;
 import com.izforge.izpack.api.exception.InstallerException;
 import com.izforge.izpack.installer.automation.PanelAutomation;
+import com.izforge.izpack.panels.userinput.field.AbstractFieldView;
+import com.izforge.izpack.panels.userinput.field.FieldView;
+import com.izforge.izpack.panels.userinput.field.custom.CustomFieldType;
 
 /**
  * Functions to support automated usage of the UserInputPanel
@@ -46,8 +53,6 @@ public class UserInputPanelAutomationHelper implements PanelAutomation
     // ------------------------------------------------------
     // automatic script section keys
     // ------------------------------------------------------
-    private static final String AUTO_KEY_USER_INPUT = "userInput";
-
     private static final String AUTO_KEY_ENTRY = "entry";
 
     // ------------------------------------------------------
@@ -57,57 +62,90 @@ public class UserInputPanelAutomationHelper implements PanelAutomation
 
     private static final String AUTO_ATTRIBUTE_VALUE = "value";
 
-    // ------------------------------------------------------
-    // String-String key-value pairs
-    // ------------------------------------------------------
-    private Map<String, String> entries;
+    private Set<String> variables;
+
+    private List<? extends AbstractFieldView> views;
 
     /**
      * Default constructor, used during automated installation.
      */
     public UserInputPanelAutomationHelper()
     {
-        this.entries = null;
+
     }
 
     /**
-     * @param entries String-String key-value pairs representing the state of the Panel
+     *
+     * @param variables
+     * @param views
      */
-    public UserInputPanelAutomationHelper(Map<String, String> entries)
+    public UserInputPanelAutomationHelper(Set<String> variables, List<? extends AbstractFieldView> views)
     {
-        this.entries = entries;
+        this.variables = variables;
+        this.views = views;
     }
 
     /**
      * Serialize state to XML and insert under panelRoot.
      *
-     * @param idata     The installation installDataGUI.
-     * @param panelRoot The XML root element of the panels blackbox tree.
+     * @param installData The installation installData GUI.
+     * @param rootElement The XML root element of the panels blackbox tree.
      */
     @Override
-    public void makeXMLData(InstallData idata, IXMLElement panelRoot)
+    public void createInstallationRecord(InstallData installData, IXMLElement rootElement)
     {
-        IXMLElement userInput;
+        HashSet<String> omitFromAutoSet = new HashSet<String>();
+        Map<String, String> entries = generateEntries(installData, variables, views, omitFromAutoSet);
         IXMLElement dataElement;
 
-        // ----------------------------------------------------
-        // add the item that combines all entries
-        // ----------------------------------------------------
-        userInput = new XMLElementImpl(AUTO_KEY_USER_INPUT, panelRoot);
-        panelRoot.addChild(userInput);
-
-        // ----------------------------------------------------
-        // add all entries
-        // ----------------------------------------------------
-        for (String key : this.entries.keySet())
+        for (String key : entries.keySet())
         {
-            String value = this.entries.get(key);
-            dataElement = new XMLElementImpl(AUTO_KEY_ENTRY, userInput);
+            dataElement = new XMLElementImpl(AUTO_KEY_ENTRY, rootElement);
             dataElement.setAttribute(AUTO_ATTRIBUTE_KEY, key);
+            String value = (omitFromAutoSet.contains(key) ? "" : entries.get(key));
             dataElement.setAttribute(AUTO_ATTRIBUTE_VALUE, value);
-
-            userInput.addChild(dataElement);
+            rootElement.addChild(dataElement);
         }
+    }
+
+    private Map<String, String> generateEntries(InstallData installData,
+                                                Set<String> variables, List<? extends AbstractFieldView> views,
+                                                HashSet<String> omitFromAutoSet)
+    {
+        Map<String, String> entries = new HashMap<String, String>();
+
+        for (String variable : variables)
+        {
+            entries.put(variable, installData.getVariable(variable));
+        }
+        for (FieldView view : views)
+        {
+            String variable = view.getField().getVariable();
+
+            if (variable != null)
+            {
+                String entry = installData.getVariable(variable);
+                if (view.getField().getOmitFromAuto()){
+                    omitFromAutoSet.add(variable);
+                }
+                entries.put(variable, entry);
+            }
+
+            // Grab all the variables contained within the custom field
+            List <String> namedVariables = new ArrayList<String>();
+            if(view instanceof CustomFieldType)
+            {
+                CustomFieldType customField = (CustomFieldType) view;
+                namedVariables = customField.getVariables();
+            }
+
+            for(String numberedVariable : namedVariables)
+            {
+                entries.put(numberedVariable, installData.getVariable(numberedVariable));
+            }
+
+        }
+        return entries;
     }
 
     /**
@@ -121,26 +159,10 @@ public class UserInputPanelAutomationHelper implements PanelAutomation
     @Override
     public void runAutomated(InstallData idata, IXMLElement panelRoot) throws InstallerException
     {
-        IXMLElement userInput;
         String variable;
         String value;
 
-        // ----------------------------------------------------
-        // get the section containing the user entries
-        // ----------------------------------------------------
-        userInput = panelRoot.getFirstChildNamed(AUTO_KEY_USER_INPUT);
-
-        if (userInput == null)
-        {
-            throw new InstallerException("Missing userInput element on line " + panelRoot.getLineNr());
-        }
-
-        List<IXMLElement> userEntries = userInput.getChildrenNamed(AUTO_KEY_ENTRY);
-
-        if (userEntries == null)
-        {
-            throw new InstallerException("Missing entry element(s) on line " + panelRoot.getLineNr());
-        }
+        List<IXMLElement> userEntries = panelRoot.getChildrenNamed(AUTO_KEY_ENTRY);
 
         // ----------------------------------------------------
         // retieve each entry and substitute the associated

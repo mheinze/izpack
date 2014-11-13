@@ -22,33 +22,7 @@
 
 package com.izforge.izpack.installer.unpacker;
 
-import static com.izforge.izpack.api.handler.Prompt.Option;
-import static com.izforge.izpack.api.handler.Prompt.Options;
-import static com.izforge.izpack.api.handler.Prompt.Type;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.jar.Pack200;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
-import com.izforge.izpack.api.data.InstallData;
-import com.izforge.izpack.api.data.OverrideType;
-import com.izforge.izpack.api.data.Pack;
-import com.izforge.izpack.api.data.PackFile;
-import com.izforge.izpack.api.data.Variables;
+import com.izforge.izpack.api.data.*;
 import com.izforge.izpack.api.event.InstallerListener;
 import com.izforge.izpack.api.event.ProgressListener;
 import com.izforge.izpack.api.exception.InstallerException;
@@ -63,6 +37,7 @@ import com.izforge.izpack.core.handler.PromptUIHandler;
 import com.izforge.izpack.data.ExecutableFile;
 import com.izforge.izpack.data.ParsableFile;
 import com.izforge.izpack.data.UpdateCheck;
+import com.izforge.izpack.installer.bootstrap.Installer;
 import com.izforge.izpack.installer.data.UninstallData;
 import com.izforge.izpack.installer.event.InstallerListeners;
 import com.izforge.izpack.installer.util.PackHelper;
@@ -75,6 +50,17 @@ import com.izforge.izpack.util.file.FileUtils;
 import com.izforge.izpack.util.file.GlobPatternMapper;
 import com.izforge.izpack.util.file.types.FileSet;
 import com.izforge.izpack.util.os.FileQueue;
+
+import java.io.*;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.*;
+import java.util.jar.Pack200;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import static com.izforge.izpack.api.handler.Prompt.*;
+import static com.izforge.izpack.installer.bootstrap.Installer.INSTALLER_AUTO;
 
 
 /**
@@ -180,6 +166,11 @@ public abstract class UnpackerBase implements IUnpacker
     private boolean disableInterrupt = false;
 
     /**
+     * Translation cache for packs
+     */
+    private Messages packMessages;
+
+    /**
      * The logger.
      */
     private static final Logger logger = Logger.getLogger(UnpackerBase.class.getName());
@@ -258,7 +249,7 @@ public abstract class UnpackerBase implements IUnpacker
             List<Pack> packs = installData.getSelectedPacks();
             preUnpack(packs);
             unpack(packs, queue, parsables, executables, updateChecks);
-            postUnpack(packs, queue, parsables, executables, updateChecks);
+            postUnpack(packs, queue, updateChecks);
         }
         catch (Exception exception)
         {
@@ -405,6 +396,19 @@ public abstract class UnpackerBase implements IUnpacker
                 listeners.beforePack(pack, i, listener);
                 unpack(pack, i, queue, parsables, executables, updateChecks);
                 checkInterrupt();
+
+                logger.fine("Found " + parsables.size() + " parsable files");
+                parseFiles(parsables);
+                checkInterrupt();
+
+                logger.fine("Found " + parsables.size() + " executable files");
+                executeFiles(executables);
+                checkInterrupt();
+
+                // update checks should be done _after_ uninstaller was put, so we don't delete it. TODO
+                performUpdateChecks(updateChecks);
+                checkInterrupt();
+
                 listeners.afterPack(pack, i, listener);
             }
         }
@@ -667,8 +671,7 @@ public abstract class UnpackerBase implements IUnpacker
      * @throws ResourceInterruptedException if installation is cancelled
      * @throws IOException                  for any I/O error
      */
-    protected void postUnpack(List<Pack> packs, FileQueue queue, List<ParsableFile> parsables,
-                              List<ExecutableFile> executables, List<UpdateCheck> updateChecks) throws IOException
+    protected void postUnpack(List<Pack> packs, FileQueue queue, List<UpdateCheck> updateChecks) throws IOException
     {
         InstallData installData = getInstallData();
 
@@ -678,16 +681,6 @@ public abstract class UnpackerBase implements IUnpacker
             queue.execute();
             installData.setRebootNecessary(queue.isRebootNecessary());
         }
-        checkInterrupt();
-
-        parseFiles(parsables);
-        checkInterrupt();
-
-        executeFiles(executables);
-        checkInterrupt();
-
-        // update checks should be done _after_ uninstaller was put, so we don't delete it. TODO
-        performUpdateChecks(updateChecks);
         checkInterrupt();
 
         listeners.afterPacks(packs, listener);
@@ -807,8 +800,21 @@ public abstract class UnpackerBase implements IUnpacker
      */
     protected String getStepName(Pack pack)
     {
+        if (packMessages == null)
+        {
+            Messages messages = installData.getMessages();
+            if (messages != null)
+            {
+              try {
+                packMessages = messages.newMessages(PackHelper.LANG_FILE_NAME);
+              } catch (Exception ex){
+                logger.fine(ex.getLocalizedMessage());
+              }
+            }
+        }
+
         // hide pack name if it is hidden
-        return pack.isHidden() ? "" : PackHelper.getPackName(pack, installData.getMessages());
+        return pack.isHidden() ? "" : PackHelper.getPackName(pack, packMessages);
     }
 
     /**
@@ -1123,29 +1129,27 @@ public abstract class UnpackerBase implements IUnpacker
             {
                 throw new InstallerException("Failed to read previous installation information", exception);
             }
+            finally
+            {
+                FileUtils.close(oin);
+                FileUtils.close(fin);
+            }
             for (Pack pack : packs)
             {
                 installedPacks.add(pack);
             }
-            FileUtils.close(oin);
-            FileUtils.close(fin);
         }
 
         FileOutputStream fout = new FileOutputStream(installationInfo);
         ObjectOutputStream oout = new ObjectOutputStream(fout);
         oout.writeObject(installedPacks);
-        /*
-        int selectedpackscount = installData.selectedPacks.size();
-        for (int i = 0; i < selectedpackscount; i++)
-        {
-            Pack pack = (Pack) installData.selectedPacks.get(i);
-            oout.writeObject(pack);
-        }
-        */
         oout.writeObject(installData.getVariables().getProperties());
+
         logger.fine("Writing installation information finished");
         FileUtils.close(oout);
         FileUtils.close(fout);
+
+        uninstallData.addFile(installationInfo.getAbsolutePath(), true);
     }
 
     protected File getAbsoluteInstallSource() throws IOException, InstallerException
@@ -1208,37 +1212,48 @@ public abstract class UnpackerBase implements IUnpacker
             {
                 result = true;
             }
-            else if (pf.override() == OverrideType.OVERRIDE_UPDATE)
-            {
-                // check mtime of involved files
-                // (this is not 100% perfect, because the
-                // already existing file might
-                // still be modified but the new installed
-                // is just a bit newer; we would
-                // need the creation time of the existing
-                // file or record with which mtime
-                // it was installed...)
-                result = (file.lastModified() < pf.lastModified());
-            }
             else
             {
-                Option defChoice = null;
-
-                if (pf.override() == OverrideType.OVERRIDE_ASK_FALSE)
+                if (pf.override() == OverrideType.OVERRIDE_UPDATE)
                 {
-                    defChoice = Option.NO;
+                    // check mtime of involved files
+                    // (this is not 100% perfect, because the
+                    // already existing file might
+                    // still be modified but the new installed
+                    // is just a bit newer; we would
+                    // need the creation time of the existing
+                    // file or record with which mtime
+                    // it was installed...)
+                    result = (file.lastModified() < pf.lastModified());
                 }
-                else if (pf.override() == OverrideType.OVERRIDE_ASK_TRUE)
+                else
                 {
-                    defChoice = Option.YES;
-                }
+                    Option defChoice = null;
 
-                Messages messages = installData.getMessages();
-                Option answer = prompt.confirm(Type.QUESTION,
-                                               messages.get("InstallPanel.overwrite.title") + " - " + file.getName(),
-                                               messages.get("InstallPanel.overwrite.question") + file.getAbsolutePath(),
-                                               Options.YES_NO, defChoice);
-                result = (answer == Option.YES);
+                    if (pf.override() == OverrideType.OVERRIDE_ASK_FALSE)
+                    {
+                        defChoice = Option.NO;
+                    }
+                    else if (pf.override() == OverrideType.OVERRIDE_ASK_TRUE)
+                    {
+                        defChoice = Option.YES;
+                    }
+
+                    // are we running in automated mode? If so use default choice.
+                    if (Installer.getInstallerMode() == INSTALLER_AUTO)
+                    {
+                        result = (defChoice == Option.YES);
+                    }
+                    else // ask the user
+                    {
+                        Messages messages = installData.getMessages();
+                        Option answer = prompt.confirm(Type.QUESTION,
+                                messages.get("InstallPanel.overwrite.title") + " - " + file.getName(),
+                                messages.get("InstallPanel.overwrite.question") + file.getAbsolutePath(),
+                                Options.YES_NO, defChoice);
+                        result = (answer == Option.YES);
+                    }
+                }
             }
         }
 
@@ -1301,6 +1316,7 @@ public abstract class UnpackerBase implements IUnpacker
         for (int i = 0; i < count; ++i)
         {
             ParsableFile file = (ParsableFile) stream.readObject();
+            logger.fine("Unpacked parsable: " + file.toString());
             if (!file.hasCondition() || isConditionTrue(file.getCondition()))
             {
                 String path = IoHelper.translatePath(file.getPath(), installData.getVariables());
@@ -1326,6 +1342,7 @@ public abstract class UnpackerBase implements IUnpacker
         for (int i = 0; i < count; ++i)
         {
             ExecutableFile file = (ExecutableFile) stream.readObject();
+            logger.fine("Unpacked executable: " + file.toString());
             if (!file.hasCondition() || isConditionTrue(file.getCondition()))
             {
                 Variables variables = installData.getVariables();

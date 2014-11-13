@@ -24,7 +24,7 @@ package com.izforge.izpack.installer.automation;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.logging.Logger;
+import java.util.List;
 
 import com.izforge.izpack.api.adaptator.IXMLElement;
 import com.izforge.izpack.api.adaptator.IXMLParser;
@@ -33,9 +33,11 @@ import com.izforge.izpack.api.data.AutomatedInstallData;
 import com.izforge.izpack.api.data.Info;
 import com.izforge.izpack.api.resource.Locales;
 import com.izforge.izpack.installer.base.InstallerBase;
+import com.izforge.izpack.installer.data.UninstallData;
 import com.izforge.izpack.installer.data.UninstallDataWriter;
 import com.izforge.izpack.installer.requirement.RequirementsChecker;
 import com.izforge.izpack.util.Housekeeper;
+import com.izforge.izpack.util.PrivilegedRunner;
 
 /**
  * Runs the install process in text only (no GUI) mode.
@@ -44,7 +46,7 @@ import com.izforge.izpack.util.Housekeeper;
  * @author Julien Ponge <julien@izforge.com>
  * @author Johannes Lehtinen <johannes.lehtinen@iki.fi>
  */
-public class AutomatedInstaller extends InstallerBase
+public class AutomatedInstaller implements InstallerBase
 {
 
     /**
@@ -78,12 +80,6 @@ public class AutomatedInstaller extends InstallerBase
     private final Housekeeper housekeeper;
 
     /**
-     * The logger.
-     */
-    private static final Logger logger = Logger.getLogger(AutomatedInstaller.class.getName());
-
-
-    /**
      * Constructs an <tt>AutomatedInstaller</tt>.
      *
      * @param panels              the panels
@@ -112,14 +108,25 @@ public class AutomatedInstaller extends InstallerBase
      * @param mediaPath     the multi-volume media directory. May be <tt>null</tt>
      * @throws Exception
      */
-    public void init(String inputFilename, String mediaPath) throws Exception
+    public void init(String inputFilename, String mediaPath, String[] args) throws Exception
     {
+        PrivilegedRunner runner = new PrivilegedRunner(installData.getPlatform());
+        if (!runner.hasCorrectPermissions(installData.getInfo(), installData.getRules()))
+        {
+            try
+            {
+                runner.relaunchWithElevatedRights(args);
+            }
+            catch (Exception e)
+            {
+                System.out.println(installData.getMessages().get("AutomatedInstaller.permissionError"));
+            }
+            System.exit(0);
+        }
         File input = new File(inputFilename);
-        // Loads the xml data
-        installData.setXmlData(getXMLData(input));
-
-        // Loads the langpack
-        String code = installData.getXmlData().getAttribute("langpack", "eng");
+        IXMLElement installRecord = getXMLData(input);
+        installData.setInstallationRecord(installRecord);
+        String code = installRecord.getAttribute("langpack", "eng");
         locales.setLocale(code);
         installData.setMessages(locales.getMessages());
         installData.setLocale(locales.getLocale(), locales.getISOCode());
@@ -134,7 +141,6 @@ public class AutomatedInstaller extends InstallerBase
     public void doInstall() throws Exception
     {
         boolean success = false;
-
         // check installer conditions
         if (!requirements.check())
         {
@@ -145,26 +151,34 @@ public class AutomatedInstaller extends InstallerBase
 
         // TODO: i18n
         System.out.println("[ Starting automated installation ]");
-        logger.info("[ Starting automated installation ]");
 
         try
         {
-            while (panels.hasNext())
+            List<IXMLElement> panelRoots = installData.getInstallationRecord().getChildren();
+            for (IXMLElement panelRoot : panelRoots)
             {
-                success = panels.next();
+                String panelId = panelRoot.getAttribute(AutomatedInstallData.AUTOINSTALL_PANELROOT_ATTR_ID);
+                for (AutomatedPanelView panelView : panels.getPanelViews())
+                {
+                    if (panelView.getPanelId().equals(panelId))
+                    {
+                        success = panels.switchPanel(panelView.getIndex(), true);
+                        break;
+                    }
+                }
                 if (!success)
                 {
                     break;
                 }
             }
+
             if (success)
             {
                 success = panels.isValid();// last panel needs to be validated
-            }
-
-            if (success && uninstallDataWriter.isUninstallRequired())
-            {
-                success = uninstallDataWriter.write();
+                if (uninstallDataWriter.isUninstallRequired())
+                {
+                    success = uninstallDataWriter.write();
+                }
             }
         }
         catch (Exception e)
@@ -223,4 +237,9 @@ public class AutomatedInstaller extends InstallerBase
         return rtn;
     }
 
+    @Override
+    public void writeInstallationRecord(File file, UninstallData uninstallData) throws Exception
+    {
+        panels.writeInstallationRecord(file, uninstallData);
+    }
 }

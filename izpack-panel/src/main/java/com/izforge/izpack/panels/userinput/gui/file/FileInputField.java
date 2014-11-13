@@ -143,7 +143,7 @@ public class FileInputField extends JPanel implements ActionListener
     private void initialize()
     {
         int size = field.getSize() < 0 ? 0 : field.getSize();
-        filetxt = new JTextField(field.getDefaultValue(), size);
+        filetxt = new JTextField(size);
         filetxt.setName(field.getVariable());
         filetxt.setCaretPosition(0);
 
@@ -165,6 +165,13 @@ public class FileInputField extends JPanel implements ActionListener
         browseBtn.addActionListener(this);
         this.add(filetxt, fileTextConstraint);
         this.add(browseBtn, fileButtonConstraint);
+    }
+
+    @Override
+    public void setEnabled(boolean enabled)
+    {
+        filetxt.setEnabled(enabled);
+        browseBtn.setEnabled(enabled);
     }
 
 }

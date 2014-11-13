@@ -23,7 +23,6 @@ package com.izforge.izpack.panels.userinput.field.combo;
 
 import com.izforge.izpack.api.data.InstallData;
 import com.izforge.izpack.api.exception.IzPackException;
-import com.izforge.izpack.panels.userinput.field.Choice;
 import com.izforge.izpack.panels.userinput.field.ChoiceField;
 import com.izforge.izpack.panels.userinput.field.ChoiceFieldConfig;
 
@@ -33,7 +32,7 @@ import com.izforge.izpack.panels.userinput.field.ChoiceFieldConfig;
  *
  * @author Tim Anderson
  */
-public class ComboField extends ChoiceField<Choice>
+public class ComboField extends ChoiceField
 {
 
     /**
@@ -42,7 +41,7 @@ public class ComboField extends ChoiceField<Choice>
      * @param config the field configuration
      * @throws IzPackException if the field cannot be read
      */
-    public ComboField(ChoiceFieldConfig<Choice> config, InstallData installData)
+    public ComboField(ChoiceFieldConfig config, InstallData installData)
     {
         super(config, installData);
     }

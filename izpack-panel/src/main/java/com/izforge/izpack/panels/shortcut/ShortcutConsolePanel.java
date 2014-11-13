@@ -28,6 +28,7 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.izforge.izpack.api.adaptator.IXMLElement;
 import com.izforge.izpack.api.data.InstallData;
 import com.izforge.izpack.api.handler.Prompt;
 import com.izforge.izpack.api.resource.Messages;
@@ -50,20 +51,10 @@ import com.izforge.izpack.util.os.Shortcut;
  */
 public class ShortcutConsolePanel extends AbstractConsolePanel
 {
-
-    /**
-     * The panel logic.
-     */
-    private final ShortcutPanelLogic logic;
-
-    /**
-     * The prompt.
-     */
     private final Prompt prompt;
+    private final InstallData installData;
+    private final ShortcutPanelLogic shortcutPanelLogic;
 
-    /**
-     * The logger.
-     */
     private static final Logger logger = Logger.getLogger(ShortcutConsolePanel.class.getName());
 
     /**
@@ -84,19 +75,20 @@ public class ShortcutConsolePanel extends AbstractConsolePanel
                                 PlatformModelMatcher matcher, Prompt prompt, PanelView<ConsolePanel> panel)
     {
         super(panel);
-        ShortcutPanelLogic logic = null;
+        ShortcutPanelLogic shortcutPanelLogic = null;
         try
         {
-            logic = new ShortcutPanelLogic(installData, resources, uninstallData, housekeeper, factory, listeners,
-                                           matcher);
+            shortcutPanelLogic = new ShortcutPanelLogic(
+                    installData, resources, uninstallData, housekeeper, factory, listeners, matcher);
         }
         catch (Exception exception)
         {
             logger.log(Level.WARNING, "Failed to initialise shortcuts: " + exception.getMessage(), exception);
         }
-        this.logic = logic;
-        this.prompt = prompt;
 
+        this.prompt = prompt;
+        this.installData = installData;
+        this.shortcutPanelLogic = shortcutPanelLogic;
     }
 
     /**
@@ -110,16 +102,15 @@ public class ShortcutConsolePanel extends AbstractConsolePanel
     public boolean run(InstallData installData, Properties properties)
     {
         boolean result = false;
-        if (logic != null)
+        if (shortcutPanelLogic != null)
         {
-            if (logic.isSupported())
+            if (shortcutPanelLogic.isSupported())
             {
             }
-            else if (logic.isSkipIfNotSupported())
+            else if (shortcutPanelLogic.skipIfNotSupported())
             {
                 result = true;
             }
-
         }
         return result;
     }
@@ -135,16 +126,38 @@ public class ShortcutConsolePanel extends AbstractConsolePanel
     public boolean run(InstallData installData, Console console)
     {
         boolean result = true;
-        if (logic != null)
+        try
         {
-            if (logic.isSupported())
+            shortcutPanelLogic.refreshShortcutData();
+        }
+        catch (Exception e)
+        {
+            return result;
+        }
+
+
+        if (shortcutPanelLogic != null  && shortcutPanelLogic.canCreateShortcuts())
+        {
+            if (shortcutPanelLogic.isSupported())
             {
-                if (prompt.confirm(QUESTION, logic.getCreateShortcutsPrompt(), YES_NO) == YES)
+                chooseShortcutLocations();
+                chooseEffectedUsers();
+                chooseProgramGroup(console);
+
+                if (shortcutPanelLogic.isCreateShortcutsImmediately())
                 {
-                    result = createShortcuts(installData, console);
+                    try
+                    {
+                        shortcutPanelLogic.createAndRegisterShortcuts();
+                    }
+                    catch (Exception e)
+                    {
+                        logger.log(Level.WARNING, e.getMessage(), e);
+                    }
                 }
+                return true;
             }
-            else if (!logic.isSkipIfNotSupported())
+            else if (!shortcutPanelLogic.skipIfNotSupported())
             {
                 Messages messages = installData.getMessages();
                 String message = messages.get("ShortcutPanel.alternate.apology");
@@ -154,57 +167,67 @@ public class ShortcutConsolePanel extends AbstractConsolePanel
         return result;
     }
 
-    private boolean createShortcuts(InstallData installData, Console console)
+    /**
+     * Prompt user where the shortcuts should be placed.
+     */
+    private void chooseShortcutLocations()
     {
-        Messages messages = installData.getMessages();
-        boolean isAdmin = logic.initUserType();
-        boolean createDesktopShortcuts = false;
-        boolean allUsers = false;
-        String programGroup = logic.getSuggestedProgramGroup();
+        Prompt.Option createMenuShortcuts = prompt.confirm(QUESTION, shortcutPanelLogic.getCreateShortcutsPrompt(), YES_NO);
+        shortcutPanelLogic.setCreateMenuShortcuts(createMenuShortcuts == YES);
 
-        if (logic.hasDesktopShortcuts())
+        if (shortcutPanelLogic.hasDesktopShortcuts())
         {
-            boolean selected = logic.isDesktopShortcutCheckboxSelected();
-            if (prompt.confirm(QUESTION, logic.getCreateDesktopShortcutsPrompt(), YES_NO,
-                               selected ? YES : NO) == YES)
-            {
-                createDesktopShortcuts = true;
-            }
+            boolean selected = shortcutPanelLogic.isDesktopShortcutCheckboxSelected();
+            Prompt.Option createDesktopShortcuts = prompt.confirm(QUESTION, shortcutPanelLogic.getCreateDesktopShortcutsPrompt(), YES_NO, selected ? YES : NO);
+            shortcutPanelLogic.setCreateDesktopShortcuts(createDesktopShortcuts == YES);
         }
-        if (isAdmin && logic.isSupportingMultipleUsers())
+
+        if (shortcutPanelLogic.hasStartupShortcuts())
         {
-            boolean selected = !logic.isDefaultCurrentUserFlag();
-            String message = logic.getCreateForUserPrompt() + " " + logic.getCreateForAllUsersPrompt();
-            // TODO - really should have a separate message
-            if (prompt.confirm(QUESTION, message, YES_NO, selected ? YES : NO) == YES)
-            {
-                allUsers = true;
-            }
+            boolean selected = shortcutPanelLogic.isStartupShortcutCheckboxSelected();
+            Prompt.Option createStartupShortcuts = prompt.confirm(QUESTION, shortcutPanelLogic.getCreateStartupShortcutsPrompt(), YES_NO, selected ? YES : NO);
+            shortcutPanelLogic.setCreateStartupShortcuts(createStartupShortcuts == YES);
         }
+    }
+
+    /**
+     * Choose for which user's the shortcuts should be created for
+     */
+    private void chooseEffectedUsers()
+    {
+        boolean isAdmin = shortcutPanelLogic.initUserType();
+        if (isAdmin && shortcutPanelLogic.isSupportingMultipleUsers())
+        {
+            boolean selected = !shortcutPanelLogic.isDefaultCurrentUserFlag();
+            String message = shortcutPanelLogic.getCreateForUserPrompt() + " " + shortcutPanelLogic.getCreateForAllUsersPrompt();
+            Prompt.Option allUsers = prompt.confirm(QUESTION, message, YES_NO, selected ? YES : NO);
+            shortcutPanelLogic.setUserType(allUsers == YES ? Shortcut.ALL_USERS : Shortcut.CURRENT_USER);
+        }
+    }
+
+    /**
+     * Choose under which program group to place the shortcuts.
+     */
+    private void chooseProgramGroup(Console console)
+    {
+        String programGroup = shortcutPanelLogic.getSuggestedProgramGroup();
         if (programGroup != null && "".equals(programGroup))
         {
-            programGroup = console.prompt(messages.get("ShortcutPanel.regular.list"), null);
-            if (programGroup == null)
-            {
-                return false;
-            }
+            programGroup = console.prompt(installData.getMessages().get("ShortcutPanel.regular.list"), "");
         }
-        logic.setGroupName(programGroup);
-        logic.setCreateDesktopShortcuts(createDesktopShortcuts);
-        logic.setCreateShortcuts(true);
-        logic.setUserType(allUsers ? Shortcut.ALL_USERS : Shortcut.CURRENT_USER);
-        if (logic.isCreateShortcutsImmediately())
+        shortcutPanelLogic.setGroupName(programGroup);
+    }
+
+    @Override
+    public void createInstallationRecord(IXMLElement panelRoot)
+    {
+        try
         {
-            try
-            {
-                logic.createAndRegisterShortcuts();
-            }
-            catch (Exception e)
-            {
-                logger.log(Level.WARNING, e.getMessage(), e);
-                // ignore exception
-            }
+            new ShortcutPanelAutomationHelper(shortcutPanelLogic).createInstallationRecord(installData, panelRoot);
         }
-        return true;
+        catch (Exception e)
+        {
+            logger.log(Level.WARNING, "Could generate automatic installer description for shortcuts.");
+        }
     }
 }

@@ -21,13 +21,9 @@ package com.izforge.izpack.compiler;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 
-import java.io.InputStream;
-import java.util.List;
 import java.util.jar.JarFile;
-import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import org.apache.commons.io.IOUtils;
 import org.hamcrest.collection.IsCollectionContaining;
 import org.hamcrest.core.IsNot;
 import org.junit.Test;
@@ -81,26 +77,15 @@ public class CompilerConfigSamplesTest
                 "resource/32/help-browser.png"))));
     }
 
+
     @Test
     @InstallFile("samples/silverpeas/silverpeas.xml")
     public void installerShouldConfigureSplashScreenCorrectly() throws Exception
     {
         compilerConfig.executeCompiler();
         jar = testContainer.getComponent(JarFile.class);
-        assertThat((ZipFile)jar, ZipMatcher.isZipMatching(IsCollectionContaining.hasItems(
-                "META-INF/Vim_splash.png")));
-        ZipEntry entry = jar.getEntry("META-INF/MANIFEST.MF");
-        InputStream content = jar.getInputStream(entry);
-        try
-        {
-            List<String> list = IOUtils.readLines(content);
-            assertThat(list, IsCollectionContaining.hasItem("SplashScreen-Image: META-INF/Vim_splash.png"));
-        }
-        finally
-        {
-            content.close();
-        }
-
+        assertThat((ZipFile)jar, ZipMatcher.isZipContainingFiles(
+                "resources/Splash.image"));
     }
 
 

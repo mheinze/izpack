@@ -21,13 +21,13 @@
 
 package com.izforge.izpack.panels.userinput.gui.rule;
 
-import javax.swing.JTextField;
-
 import com.izforge.izpack.api.handler.Prompt;
 import com.izforge.izpack.panels.userinput.field.Field;
 import com.izforge.izpack.panels.userinput.field.ValidationStatus;
 import com.izforge.izpack.panels.userinput.field.rule.RuleField;
 import com.izforge.izpack.panels.userinput.gui.GUIField;
+
+import javax.swing.*;
 
 
 /**
@@ -62,6 +62,7 @@ public class GUIRuleField extends GUIField
         }
 
         addField(component);
+        addTooltip();
     }
 
     /**
@@ -117,5 +118,54 @@ public class GUIRuleField extends GUIField
             prompt.warn(status.getMessage());
         }
         return result;
+    }
+
+    /**
+     * Updates the view from the field.
+     *
+     * @return {@code true} if the view was updated
+     */
+    @Override
+    public boolean updateView()
+    {
+        boolean result = false;
+        String value = getField().getValue();
+
+        if (value != null)
+        {
+            replaceValue(value);
+            result = true;
+        }
+        else
+        {
+            // Set default value here for getting current variable values replaced
+            Field f = getField();
+            String defaultValue = f.getDefaultValue();
+            if (defaultValue != null)
+            {
+                replaceValue(defaultValue);
+            }
+        }
+
+        return result;
+    }
+
+    private void replaceValue(String value)
+    {
+        RuleField f = (RuleField) getField();
+        if (value != null)
+        {
+            ValidationStatus status = f.validateFormatted(value);
+            if (status.isValid())
+            {
+                String[] values = status.getValues();
+                int id = 0;
+                for (JTextField input : component.getInputFields())
+                {
+                    input.setText(values[id]);
+                    id++;
+                }
+            }
+        }
     }
 }

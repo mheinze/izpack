@@ -19,7 +19,6 @@
 
 package com.izforge.izpack.compiler.packager;
 
-import java.io.File;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
@@ -67,13 +66,6 @@ public interface IPackager
      * @param prefs The new gUIPrefs value
      */
     public abstract void setGUIPrefs(GUIPrefs prefs);
-
-    /**
-     * Sets the splash screen image file.
-     *
-     * @param file the splash screen image file. May be <tt>null</tt>
-     */
-    void setSplashScreenImage(File file);
 
     /**
      * Allows access to add, remove and update the variables for the project, which are maintained

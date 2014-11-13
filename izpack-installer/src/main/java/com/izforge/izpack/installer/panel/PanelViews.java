@@ -21,6 +21,9 @@
 
 package com.izforge.izpack.installer.panel;
 
+import com.izforge.izpack.installer.data.UninstallData;
+
+import java.io.File;
 import java.util.List;
 
 
@@ -60,5 +63,15 @@ public interface PanelViews<T extends AbstractPanelView<V>, V> extends Panels
      * @return the panel's visible index, or {@code -1} if the panel is not visible
      */
     int getVisibleIndex(T panel);
+
+
+    /**
+     * Writes an XML tree to a file.
+     *
+     * @param file file of where the auto-install will be placed
+     * @param uninstallData used to ensure that the file will be removed by the uninstaller
+     * @throws Exception
+     */
+    void writeInstallationRecord(File file, UninstallData uninstallData) throws Exception;
 
 }

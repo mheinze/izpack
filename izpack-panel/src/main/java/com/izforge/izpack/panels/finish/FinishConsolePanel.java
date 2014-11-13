@@ -21,16 +21,11 @@
 
 package com.izforge.izpack.panels.finish;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.util.List;
 import java.util.Properties;
 import java.util.logging.Logger;
 
 import com.izforge.izpack.api.adaptator.IXMLElement;
-import com.izforge.izpack.api.adaptator.IXMLWriter;
-import com.izforge.izpack.api.adaptator.impl.XMLWriter;
 import com.izforge.izpack.api.data.AutomatedInstallData;
 import com.izforge.izpack.api.data.InstallData;
 import com.izforge.izpack.api.factory.ObjectFactory;
@@ -41,50 +36,55 @@ import com.izforge.izpack.api.handler.Prompt.Type;
 import com.izforge.izpack.installer.automation.AutomatedPanelView;
 import com.izforge.izpack.installer.automation.AutomatedPanels;
 import com.izforge.izpack.installer.console.AbstractConsolePanel;
+import com.izforge.izpack.installer.console.ConsoleInstaller;
 import com.izforge.izpack.installer.console.ConsolePanel;
 import com.izforge.izpack.installer.console.ConsolePanelAutomationHelper;
 import com.izforge.izpack.installer.container.provider.AutomatedPanelsProvider;
+import com.izforge.izpack.installer.data.UninstallData;
 import com.izforge.izpack.installer.panel.PanelView;
 import com.izforge.izpack.util.Console;
 import com.izforge.izpack.util.PlatformModelMatcher;
-import com.izforge.izpack.util.file.FileUtils;
 
 /**
  * Console implementation of the {@link FinishPanel}.
- * 
+ *
  * @author Mounir el hajj
  */
 public class FinishConsolePanel extends AbstractConsolePanel
 {
     private static final Logger LOGGER = Logger.getLogger(FinishConsolePanel.class.getName());
-    private static final String AUTO_INSTALL_SCRIPT_NAME = "autoInstall.xml";
+    private static final String AUTO_INSTALL_SCRIPT_NAME = "auto-install.xml";
 
     private final Prompt prompt;
     private final ObjectFactory factory;
     private final PlatformModelMatcher matcher;
-    
+    private final ConsoleInstaller parent;
+    private final UninstallData uninstallData;
+
     /**
      * Constructs an {@code FinishConsolePanel}.
-     * 
+     *
      * @param panel the parent panel/view. May be {@code null}
      */
-    public FinishConsolePanel(final ObjectFactory factory, final PlatformModelMatcher matcher,
-            Prompt prompt, PanelView<ConsolePanel> panel)
+    public FinishConsolePanel(final ObjectFactory factory, ConsoleInstaller parent, final PlatformModelMatcher matcher,
+            UninstallData uninstallData, Prompt prompt, PanelView<ConsolePanel> panel)
     {
         super(panel);
+        this.parent = parent;
         this.prompt = prompt;
         this.factory = factory;
         this.matcher = matcher;
+        this.uninstallData = uninstallData;
     }
 
     public FinishConsolePanel(PanelView<ConsolePanel> panel)
     {
-        this(null, null, null, panel);
+        this(null, null, null, null, null, panel);
     }
 
     /**
      * Runs the panel using the supplied properties.
-     * 
+     *
      * @param installData the installation data
      * @param properties the properties
      * @return <tt>true</tt>
@@ -97,7 +97,7 @@ public class FinishConsolePanel extends AbstractConsolePanel
 
     /**
      * Runs the panel using the specified console.
-     * 
+     *
      * @param installData the installation data
      * @param console the console
      * @return <tt>true</tt>
@@ -107,7 +107,7 @@ public class FinishConsolePanel extends AbstractConsolePanel
     {
         if (doGenerateAutoInstallScript())
         {
-            generateAutoInstallScript(installData, console);
+            generateAutoInstallScript(installData, uninstallData, console);
         }
 
         if (installData.isInstallSuccess())
@@ -127,7 +127,7 @@ public class FinishConsolePanel extends AbstractConsolePanel
         return (factory != null && matcher != null && prompt != null);
     }
 
-    private void generateAutoInstallScript(InstallData installData, Console console)
+    private void generateAutoInstallScript(InstallData installData, UninstallData uninstallData, Console console)
     {
         Option userAnswer;
         userAnswer = prompt.confirm(Type.QUESTION, installData.getMessages()
@@ -147,7 +147,7 @@ public class FinishConsolePanel extends AbstractConsolePanel
             file = new File(parentPath, AUTO_INSTALL_SCRIPT_NAME);
 
             String filePath;
-            filePath = console.prompt("Select the installation script (path must be absolute)["
+            filePath = console.promptLocation("Select the installation script (path must be absolute)["
                     + file.getAbsolutePath() + "]", file.getAbsolutePath(), null);
 
             File newFile;
@@ -165,51 +165,21 @@ public class FinishConsolePanel extends AbstractConsolePanel
             }
             else
             {
-                generateAutoInstallScript(newFile, installData, console);
+                generateAutoInstallScript(newFile, installData, uninstallData, console);
             }
         }
     }
 
     private void generateAutoInstallScript(final File file, final InstallData installData,
-            final Console console)
+            final UninstallData uninstallData, final Console console)
     {
-        BufferedOutputStream outputStream;
-        outputStream = null;
-
         try
         {
-            outputStream = new BufferedOutputStream(new FileOutputStream(file), 5120);
-
-            IXMLWriter writer;
-            writer = new XMLWriter(outputStream);
-
-            IXMLElement root;
-            root = installData.getXmlData();
-
-            AutomatedPanels automatedPanels;
-            automatedPanels = getAutomatedPanels(installData);
-
-            List<AutomatedPanelView> panelViews;
-            panelViews = automatedPanels.getPanelViews();
-
-            int index = 0;
-            for (AutomatedPanelView panelView : panelViews)
-            {
-                makeXML(panelView, installData, root.getChildAtIndex(index));
-                index = index + 1;
-            }
-            writer.write(root);
-            outputStream.flush();
-
+            parent.writeInstallationRecord(file, uninstallData);
         }
-        catch (Exception e)
+        catch (Exception err)
         {
-            console.println("failed to save the installation into file [" + file.getAbsolutePath()
-                    + "]");
-        }
-        finally
-        {
-            FileUtils.close(outputStream);
+            console.println("failed to save the installation into file [" + file.getAbsolutePath() + "]");
         }
     }
 
@@ -230,7 +200,7 @@ public class FinishConsolePanel extends AbstractConsolePanel
     {
         try
         {
-            panelView.getView().makeXMLData(installData, root);
+            panelView.getView().createInstallationRecord(installData, root);
 
         }
         catch (Exception e)

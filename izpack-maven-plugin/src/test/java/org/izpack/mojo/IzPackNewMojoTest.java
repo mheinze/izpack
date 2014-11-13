@@ -3,13 +3,9 @@ package org.izpack.mojo;
 import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.io.File;
-import java.io.InputStream;
-import java.util.List;
 import java.util.jar.JarFile;
-import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.maven.plugin.testing.AbstractMojoTestCase;
 import org.hamcrest.collection.IsCollectionContaining;
 import org.hamcrest.core.Is;
@@ -37,17 +33,10 @@ public class IzPackNewMojoTest extends AbstractMojoTestCase {
         File file = new File( "target/sample/izpackResult.jar" );
         assertThat( file.exists(), Is.is( true ) );
         JarFile jar = new JarFile( file );
-        assertThat( (ZipFile)jar, ZipMatcher.isZipMatching( IsCollectionContaining.hasItems( "com/izforge/izpack/core/container/AbstractContainer.class", "com/izforge/izpack/uninstaller/Destroyer.class", "com/izforge/izpack/panels/checkedhello/CheckedHelloPanel.class", "META-INF/Test.png" ) ) );
-
-        ZipEntry entry = jar.getEntry( "META-INF/MANIFEST.MF" );
-        InputStream content = jar.getInputStream( entry );
-        try {
-            List<String> list = IOUtils.readLines( content );
-            assertThat( list, IsCollectionContaining.hasItem( "SplashScreen-Image: META-INF/Test.png" ) );
-        } finally {
-            content.close();
-        }
-
+        assertThat( (ZipFile)jar, ZipMatcher.isZipMatching( IsCollectionContaining.hasItems(
+                "com/izforge/izpack/core/container/AbstractContainer.class",
+                "com/izforge/izpack/uninstaller/Destroyer.class",
+                "com/izforge/izpack/panels/checkedhello/CheckedHelloPanel.class")));
     }
 
     @Test

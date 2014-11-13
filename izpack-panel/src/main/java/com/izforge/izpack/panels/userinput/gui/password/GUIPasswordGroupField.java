@@ -21,11 +21,6 @@
 
 package com.izforge.izpack.panels.userinput.gui.password;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import javax.swing.JPasswordField;
-
 import com.izforge.izpack.api.handler.Prompt;
 import com.izforge.izpack.gui.TwoColumnConstraints;
 import com.izforge.izpack.panels.userinput.field.Field;
@@ -33,6 +28,11 @@ import com.izforge.izpack.panels.userinput.field.ValidationStatus;
 import com.izforge.izpack.panels.userinput.field.password.PasswordField;
 import com.izforge.izpack.panels.userinput.field.password.PasswordGroupField;
 import com.izforge.izpack.panels.userinput.gui.GUIField;
+
+import javax.swing.*;
+
+import java.util.ArrayList;
+import java.util.List;
 
 
 /**
@@ -70,6 +70,7 @@ public class GUIPasswordGroupField extends GUIField
             passwords.add(component);
             addComponent(component, new TwoColumnConstraints(TwoColumnConstraints.EAST));
         }
+        addTooltip();
     }
 
     /**
@@ -119,12 +120,20 @@ public class GUIPasswordGroupField extends GUIField
 
         if (value != null)
         {
-            for (JPasswordField view : passwords)
-            {
-                view.setText(replaceVariables(value));
-            }
+            passwords.get(0).setText(replaceVariables(value));
             result = true;
         }
+        else
+        {
+            // Set default value here for getting current variable values replaced
+            Field field = getField();
+            String defaultValue = field.getDefaultValue();
+            if (defaultValue != null)
+            {
+                passwords.get(0).setText(defaultValue);
+            }
+        }
+
         return result;
     }
 

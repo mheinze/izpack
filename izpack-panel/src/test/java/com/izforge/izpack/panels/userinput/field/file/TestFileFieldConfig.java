@@ -80,6 +80,12 @@ public class TestFileFieldConfig extends TestFieldConfig implements FileFieldCon
         return false;
     }
 
+    @Override
+    public boolean mustExist()
+    {
+        return true;
+    }
+
     /**
      * Determines if empty input values are allowed.
      *
@@ -88,5 +94,10 @@ public class TestFileFieldConfig extends TestFieldConfig implements FileFieldCon
     public void setAllowEmptyValue(boolean allow)
     {
         allowEmptyInput = allow;
+    }
+
+    @Override
+    public boolean getOmitFromAuto() {
+        return false;
     }
 }

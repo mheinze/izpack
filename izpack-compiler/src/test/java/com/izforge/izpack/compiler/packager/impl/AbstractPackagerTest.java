@@ -26,7 +26,6 @@ import static org.junit.Assert.fail;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.io.File;
@@ -46,7 +45,6 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import com.izforge.izpack.api.data.Blockable;
-import com.izforge.izpack.api.data.GUIPrefs;
 import com.izforge.izpack.api.data.OverrideType;
 import com.izforge.izpack.api.data.Pack;
 import com.izforge.izpack.compiler.stream.JarOutputStream;
@@ -76,23 +74,9 @@ public abstract class AbstractPackagerTest
     public void noSplash() throws IOException
     {
         PackagerBase packager = createPackager(Mockito.mock(JarOutputStream.class), mergeManager);
-        packager.setSplashScreenImage(null);
         packager.writeManifest();
 
         verify(mergeManager).addResourceToMerge(anyString(), eq("META-INF/MANIFEST.MF"));
-    }
-
-    @Test
-    public void guiPrefsWithSplash() throws IOException
-    {
-        final File splashImage = new File("image.png");
-        PackagerBase packager = createPackager(Mockito.mock(JarOutputStream.class), mergeManager);
-        packager.setGUIPrefs(new GUIPrefs());
-        packager.setSplashScreenImage(splashImage);
-        packager.writeManifest();
-
-        verify(mergeManager, times(1)).addResourceToMerge(anyString(), eq("META-INF/image.png"));
-        verify(mergeManager, times(1)).addResourceToMerge(anyString(), eq("META-INF/MANIFEST.MF"));
     }
 
     @Test

@@ -24,9 +24,7 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
@@ -41,6 +39,7 @@ import com.izforge.izpack.gui.ButtonFactory;
 import com.izforge.izpack.gui.LabelFactory;
 import com.izforge.izpack.gui.log.Log;
 import com.izforge.izpack.installer.data.GUIInstallData;
+import com.izforge.izpack.installer.data.UninstallData;
 import com.izforge.izpack.installer.data.UninstallDataWriter;
 import com.izforge.izpack.installer.gui.InstallerFrame;
 import com.izforge.izpack.installer.gui.IzPanel;
@@ -62,6 +61,8 @@ public class FinishPanel extends IzPanel implements ActionListener
 
     private UninstallDataWriter uninstallDataWriter;
 
+    private UninstallData uninstallData;
+
     /**
      * The log.
      */
@@ -78,9 +79,10 @@ public class FinishPanel extends IzPanel implements ActionListener
      * @param log                 the log
      */
     public FinishPanel(Panel panel, InstallerFrame parent, GUIInstallData installData, Resources resources,
-                       UninstallDataWriter uninstallDataWriter, Log log)
+                       UninstallDataWriter uninstallDataWriter, UninstallData uninstallData, Log log)
     {
         super(panel, parent, installData, new GridBagLayout(), resources);
+        this.uninstallData = uninstallData;
         this.uninstallDataWriter = uninstallDataWriter;
         this.log = log;
     }
@@ -90,19 +92,18 @@ public class FinishPanel extends IzPanel implements ActionListener
      *
      * @return true if the panel has been validated.
      */
+    @Override
     public boolean isValidated()
     {
         return true;
     }
 
-    /**
-     * Called when the panel becomes active.
-     */
+    @Override
     public void panelActivate()
     {
         parent.lockNextButton();
         parent.lockPrevButton();
-        parent.setQuitButtonText(getString("FinishPanel.done"));
+        parent.setQuitButtonText(getI18nStringForClass("done"));
         parent.setQuitButtonIcon("done");
         Insets inset = new Insets(10, 20, 2, 2);
         GridBagConstraints constraints = new GridBagConstraints(0, 0, 1, 1, 0, 0, GridBagConstraints.LINE_START,
@@ -110,7 +111,7 @@ public class FinishPanel extends IzPanel implements ActionListener
         if (this.installData.isInstallSuccess())
         {
             // We set the information
-            JLabel jLabel = LabelFactory.create(getString("FinishPanel.success"), parent.getIcons().get("preferences"),
+            JLabel jLabel = LabelFactory.create(getI18nStringForClass("success"), parent.getIcons().get("preferences"),
                                                 LEADING);
             jLabel.setName(GuiId.FINISH_PANEL_LABEL.id);
             add(jLabel, constraints);
@@ -120,7 +121,7 @@ public class FinishPanel extends IzPanel implements ActionListener
                 // We prepare a message for the uninstaller feature
                 String path = translatePath("$INSTALL_PATH") + File.separator + "Uninstaller";
 
-                add(LabelFactory.create(getString("FinishPanel.uninst.info"), parent.getIcons()
+                add(LabelFactory.create(getI18nStringForClass("uninst.info"), parent.getIcons()
                         .get("preferences"), LEADING), constraints);
                 constraints.gridy++;
                 add(LabelFactory.create(path, parent.getIcons().get("empty"),
@@ -128,59 +129,48 @@ public class FinishPanel extends IzPanel implements ActionListener
                 constraints.gridy++;
             }
             // We add the autoButton
-            autoButton = ButtonFactory.createButton(getString("FinishPanel.auto"),
+            autoButton = ButtonFactory.createButton(getI18nStringForClass("auto"),
                                                     parent.getIcons().get("edit"), this.installData.buttonsHColor);
             autoButton.setName(GuiId.FINISH_PANEL_AUTO_BUTTON.id);
-            autoButton.setToolTipText(getString("FinishPanel.auto.tip"));
+            autoButton.setToolTipText(getI18nStringForClass("auto.tip"));
             autoButton.addActionListener(this);
             add(autoButton, constraints);
             constraints.gridy++;
         }
         else
         {
-            add(LabelFactory.create(getString("FinishPanel.fail"), parent.getIcons().get("stop"), LEADING),
+            add(LabelFactory.create(getI18nStringForClass("fail"), parent.getIcons().get("stop"), LEADING),
                 constraints);
         }
         getLayoutHelper().completeLayout(); // Call, or call not?
         log.informUser();
     }
 
-    /**
-     * Actions-handling method.
-     *
-     * @param e The event.
-     */
+    @Override
     public void actionPerformed(ActionEvent e)
     {
         // Prepares the file chooser
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setName(GuiId.FINISH_PANEL_FILE_CHOOSER.id);
         fileChooser.setCurrentDirectory(new File(this.installData.getInstallPath()));
+        fileChooser.setSelectedFile(new File(this.installData.getInstallPath(), "auto-install.xml"));
         fileChooser.setMultiSelectionEnabled(false);
         fileChooser.addChoosableFileFilter(new AutomatedInstallScriptFilter(installData.getMessages()));
-        // fileChooser.setCurrentDirectory(new File("."));
 
-        // Shows it
         try
         {
             if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION)
             {
                 // We handle the xml installDataGUI writing
                 File file = fileChooser.getSelectedFile();
-                FileOutputStream out = new FileOutputStream(file);
-                BufferedOutputStream outBuff = new BufferedOutputStream(out, 5120);
-                parent.writeXMLTree(this.installData.getXmlData(), outBuff);
-                outBuff.flush();
-                outBuff.close();
-
+                parent.writeInstallationRecord(file, uninstallData);
                 autoButton.setEnabled(false);
             }
         }
         catch (Exception err)
         {
-            err.printStackTrace();
             JOptionPane.showMessageDialog(this, err.toString(), getString("installer.error"),
-                                          JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.ERROR_MESSAGE);
         }
     }
 

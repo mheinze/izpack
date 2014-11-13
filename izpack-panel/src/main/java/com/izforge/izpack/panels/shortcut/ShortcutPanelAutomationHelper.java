@@ -63,6 +63,10 @@ public class ShortcutPanelAutomationHelper extends PanelAutomationHelper impleme
         shortcutPanelLogic = new ShortcutPanelLogic(installData, resources, uninstallData,
                                                     housekeeper, factory, listeners, matcher);
     }
+    public ShortcutPanelAutomationHelper(ShortcutPanelLogic shortcutPanelLogic) throws Exception
+    {
+        this.shortcutPanelLogic = shortcutPanelLogic;
+    }
 
     /**
      * Create the xml configuration content for automatic installation. Normally this method is not
@@ -72,7 +76,7 @@ public class ShortcutPanelAutomationHelper extends PanelAutomationHelper impleme
      * @param panelRoot   panel specific data for autoinstall.xml
      */
     @Override
-    public void makeXMLData(InstallData installData, IXMLElement panelRoot)
+    public void createInstallationRecord(InstallData installData, IXMLElement panelRoot)
     {
         for (IXMLElement element : shortcutPanelLogic.getAutoinstallXMLData(panelRoot))
         {
@@ -94,6 +98,7 @@ public class ShortcutPanelAutomationHelper extends PanelAutomationHelper impleme
         {
             try
             {
+                shortcutPanelLogic.refreshShortcutData();
                 shortcutPanelLogic.createAndRegisterShortcuts();
             }
             catch (Exception e)

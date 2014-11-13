@@ -28,9 +28,34 @@
     <str id="SimpleFinishPanel.headline" txt="Installation Finished"/>
     <str id="SummaryPanel.headline" txt="Summary Configuration Data"/>
     <str id="TargetPanel.headline" txt="Target Path"/>
+    <str id="TreePacksPanel.headline" txt="Select Installation Packages"/>
     <str id="UserInputPanel.headline" txt="User Data"/>
     <str id="UserPathPanel.headline" txt="Select Path"/>
     <str id="InstallationTypePanel.headline" txt="Installation Type"/>
+
+    <!-- TreePacksPanel Strings -->
+    <str id="TreePacksPanel.confirm"
+         txt="Press 0 to confirm your selections."/>
+    <str id="TreePacksPanel.prompt"
+         txt="Please select which packs you want to install."/>
+    <str id="TreePacksPanel.no.packs"
+         txt="You have not selected any packs!\nAre you sure you want to continue?"/>
+    <str id="TreePacksPanel.space.required"
+         txt="Total space required:"/>
+    <str id="TreePacksPanel.invalid"
+         txt="Invalid pack selected"/>
+    <str id="TreePacksPanel.dependent"
+         txt="Dependencies"/>
+    <str id="TreePacksPanel.children"
+         txt="Children"/>
+    <str id="TreePacksPanel.no.number"
+         txt="Please enter a number from the selection above."/>
+    <str id="TreePacksPanel.required"
+         txt="Required"/>
+    <str id="TreePacksPanel.unselectable"
+         txt="Unselectable"/>
+    <str id="TreePacksPanel.done"
+         txt="Done!"/>
 
     <!-- General installer strings -->
     <str id="installer.title" txt="IzPack - Installation of "/>
@@ -83,6 +108,8 @@
     <str id="InfoPanel.info" txt="Please read the following information: "/>
 
     <!-- PathInputPanel strings -->
+    <str id="PathInputPanel.isfile"
+        txt="You have entered a path to a file. Please select a path to a new or existing directory."/>
     <str id="PathInputPanel.required" txt="The chosen directory should exist."/>
     <str id="PathInputPanel.required.forModificationInstallation" txt="The chosen directory should exist."/>
     <str id="PathInputPanel.notValid"
@@ -101,6 +128,8 @@
          txt="This directory can not be written! Please choose another directory!"/>
     <str id="TargetPanel.incompatibleInstallation"
          txt="Incompatible installation detected. Uninstall it first, or choose another directory to install to."/>
+    <str id="TargetPanel.syntax.error"
+         txt="Invalid directory path. Please enter a directory path that meets the operating system's requirements."/>
 
     <!-- JDKPathPanel strings -->
     <str id="JDKPathPanel.extendedIntro"
@@ -110,7 +139,8 @@
     <str id="JDKPathPanel.info" txt="Select the JDK path:"/>
     <str id="JDKPathPanel.badVersion1" txt="The chosen JDK has the wrong version (available: "/>
     <str id="JDKPathPanel.badVersion2" txt=" required: "/>
-    <str id="JDKPathPanel.badVersion3" txt=") should this JDK be used anyway?"/>
+    <str id="JDKPathPanel.badVersion3" txt="). Should this JDK be used anyway?"/>
+    <str id="JDKPathPanel.badVersion4" txt="Continue anyway? [y/n] [n]"/>
     <str id="JDKPathPanel.nonValidPathInReg"
          txt="The Windows registry contains a non-valid path for this JDK. Should this JDK be used anyway?"/>
     <str id="JDKPathPanel.jdkDownload"
@@ -172,6 +202,7 @@
     <str id="ShortcutPanel.regular.list" txt="Select a Program Group for the Shortcuts:"/>
     <str id="ShortcutPanel.regular.default" txt="Default"/>
     <str id="ShortcutPanel.regular.desktop" txt="Create additional shortcuts on the desktop"/>
+    <str id="ShortcutPanel.regular.startup" txt="Launch on startup"/>
     <str id="ShortcutPanel.regular.create" txt="Create shortcuts in the StartMenu"/>
     <str id="ShortcutPanel.regular.userIntro" txt="create shortcut for:"/>
     <str id="ShortcutPanel.regular.currentUser" txt="current user"/>
@@ -199,6 +230,7 @@
     <str id="ShortcutPanel.location.startup" txt="Startup Group"/>
     <str id="ShortcutPanel.regular.StartMenu:Start-Menu" txt="Start-Menu"/>
     <str id="ShortcutPanel.regular.StartMenu:K-Menu" txt="XDG-Menu"/>
+    <str id="ShortcutPanel.group.error" txt="Invalid program group. Please enter an alphnumeric string."/>
 
     <!-- UserInputPanel strings -->
     <str id="UserInputPanel.error.caption" txt="Error"/>
@@ -299,6 +331,10 @@ file we looked for -->
     <str id="ConsoleInstaller.continueQuitRedisplay" txt="Press 1 to continue, 2 to quit, 3 to redisplay"/>
     <str id="ConsoleInstaller.acceptRejectRedisplay" txt="Press 1 to accept, 2 to reject, 3 to redisplay"/>
     <str id="ConsoleInstaller.redisplayQuit" txt="Press 1 to redisplay, 2 to quit"/>
+    <str id="ConsoleInstaller.permissionError" txt="Administrative privileges required. Please re-run the installer with administrative privileges."/>
+
+    <!-- AutomatedInstaller Strings -->
+    <str id="AutomatedInstaller.permissionError" txt="Administrative privileges required. Please re-run the installer with administrative privileges."/>
 
     <!-- Next Media Strings -->
     <str id="nextmedia.title" txt="Next install media"/>
